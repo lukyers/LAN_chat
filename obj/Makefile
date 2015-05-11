@@ -1,5 +1,6 @@
 CC = gcc
-CFLAGS = -g -Wall -lpthread
+CFLAGS = -g -Wall -lpthread -DNDEBUG
+#CFLAGS = -g -Wall -lpthread
 all:server client
 
 server:list_com.o srv_msg_com.o server.o

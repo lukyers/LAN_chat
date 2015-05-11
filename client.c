@@ -57,6 +57,7 @@ int main(int argc, char const *argv[])
 	udp_srvaddr.sin_port = htons(SOCK_UDP_PORT);
 	udp_srvaddr.sin_addr.s_addr = inet_addr(SRV_IPADDR);
 
+#ifdef NDEBUG
 	ret_val = bind(udp_cli_fd, (const struct sockaddr *) &udp_selfaddr, sizeof(udp_selfaddr));
 	if (ret_val < 0)
 	{
@@ -73,10 +74,10 @@ int main(int argc, char const *argv[])
 		perror("setsockopt IP_ADD_MEMBERSHIP error");
 		exit(1);
 	}
-
+#endif
 	strcpy(user_name, argv[1]);
 	snd_login(user_name);
-	bzero(p_tid, sizeof(p_tid));
+	bzero(p_tid,sizeof(p_tid));
 
 	ret_val = pthread_create(&p_tid[1], NULL, recvfrom_ser, NULL);
 	if (ret_val < 0)
@@ -279,6 +280,10 @@ void *recvfrom_ser(void *arg)
 			case IMSG_SRVOFF:		//服务器关闭是,通知各个客户端的消息
 				puts("系统提示:服务器关闭!");
 				clear_func();		//服务器都关闭了,客户端紧跟着自动结束
+				break;
+
+			case IMSG_TEST:
+				printf("[%s]\n", msgbuf.text);
 				break;
 
 			default :

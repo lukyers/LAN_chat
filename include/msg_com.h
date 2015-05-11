@@ -60,6 +60,7 @@ enum IMSG_INFO {
 	IMSG_HELP,
 	IMSG_ERR0,		
 	IMSG_ERR1,
+	IMSG_TEST,
 	//......
 	IMSG_MAX
 };

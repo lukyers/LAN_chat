@@ -37,9 +37,9 @@
 #define COM_BUFSZ 20
 #define MSG_BUFSZ 512
 
-#define SOCK_UDP_PORT 15976
+#define SOCK_UDP_PORT 9999
 #define SOCK_TCP_PORT 35714 
-#define SRV_IPADDR "192.168.1.104"
+#define SRV_IPADDR "192.168.1.108"
 #define MC_IPADDR "235.147.123.100"
 #define DOWNPATH "./download"
 

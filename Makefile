@@ -7,8 +7,8 @@ S_MSG_LIST = ./obj/srv_msg_com.o
 S_OBJS = ./obj/server.o
 C_OBJS = ./obj/client.o
 
-#CFLAGS = -lpthread -DNDEBUG
-CFLAGS = -g -Wall -lpthread
+#CFLAGS = -g -Wall -lpthread
+CFLAGS = -g -Wall -lpthread -DNDEBUG
 
 all:$(C_LIST) $(C_MSG) $(C_MSG_LIST) $(S_MSG_LIST) $(S_OBJS) $(C_OBJS)
 

@@ -25,7 +25,7 @@ void snd_login(const char *user_name)
 	strcpy(msg_login.mname, user_name);		//设定登录的用户名
 	msg_login.mname[NAME_LEN - 1] = '\0';
 	//通过UDP发送消息到服务器
-	num = sendto(udp_cli_fd, &msg_login, sizeof(msg_login) - MSG_BUFSZ, 0, 
+	num = sendto(udp_cli_fd, &msg_login, sizeof(msg_login) - MSG_BUFSZ, 0, \
 					(const struct sockaddr *)&udp_srvaddr, sizeof(udp_srvaddr));
 	if(num < 0) {
 		perror("snd_login sendto");

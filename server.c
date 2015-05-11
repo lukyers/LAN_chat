@@ -13,9 +13,11 @@ void exec_func(int);
 
 void *recvfrom_cli(void *arg);
 void *process_msg(void *arg);
+void snd_msg_group(const long msg_type,const char *name,const char *text);
 
 static int udp_serv_fd = -1;
-static struct sockaddr_in udp_servaddr;
+static struct sockaddr_in udp_srvaddr;
+static struct sockaddr_in udp_cliaddr;
 pthread_t p_tid[3];
 static struct msg_info *msg_head = NULL;
 static struct user_info *user_head = NULL;
@@ -44,13 +46,18 @@ int main(int argc, char const *argv[])
 		exit(1);
 	}
 
-	bzero(&udp_servaddr, sizeof(udp_servaddr));
-	udp_servaddr.sin_family = AF_INET;
-	udp_servaddr.sin_port = htons(SOCK_UDP_PORT);
-	udp_servaddr.sin_addr.s_addr = inet_addr(SRV_IPADDR);
+	bzero(&udp_srvaddr, sizeof(udp_srvaddr));
+	bzero(&udp_cliaddr, sizeof(udp_cliaddr));
+	udp_srvaddr.sin_family = AF_INET;
+	udp_srvaddr.sin_port = htons(SOCK_UDP_PORT);
+	udp_srvaddr.sin_addr.s_addr = inet_addr(SRV_IPADDR);
 
-	ret_val = bind(udp_serv_fd, (const struct sockaddr *) &udp_servaddr, 
-					sizeof(udp_servaddr));
+	udp_cliaddr.sin_family = AF_INET;
+	udp_cliaddr.sin_port = htons(SOCK_UDP_PORT);
+	udp_cliaddr.sin_addr.s_addr = inet_addr(MC_IPADDR);
+
+	ret_val = bind(udp_serv_fd, (const struct sockaddr *) &udp_srvaddr, 
+					sizeof(udp_srvaddr));
 	if (ret_val < 0)
 	{
 		perror("bind error");
@@ -95,9 +102,26 @@ void catch_signal(void)
 
 void exec_func(int signo)
 {
+	int num = -1;
+	struct msg_info msgbuf;
+
+	bzero(&msgbuf, sizeof(msgbuf));
+	msgbuf.msg_node.mtype = IMSG_SRVOFF;
+#ifdef NDEBUG
+	num = sendto(udp_serv_fd, (void *) &msgbuf.msg_node, \
+					sizeof(msgbuf.msg_node), 0, \
+					(const struct sockaddr *) &udp_cliaddr, \
+					sizeof(udp_cliaddr));
+	if (num < 0)
+	{
+		perror("server off error");
+	}
+#else
+	snd_msg_group(IMSG_SRVOFF, " ", " ");
+#endif
+	
 	pthread_cancel(p_tid[0]);
 	pthread_cancel(p_tid[1]);
-
 	sem_close(&msg_sem);
 	close(udp_serv_fd);
 	destroy_list(user_head);
@@ -164,16 +188,41 @@ void *process_msg(void *arg)
 						if (num < 0) perror("login sendto error");
 						break;
 					}
+
 					bzero(&data_node, sizeof(data_node));
 					strcpy(data_node.user_name, msgbuf.msg_node.mname);
 					memcpy(&(data_node.cli_addr), &(msgbuf.msg_node.cli_addr), sizeof(data_node.cli_addr));
 					add_list(user_head, &data_node);
 					printf("[%s] login \n", data_node.user_name);
+#ifdef NDEBUG
+					num = sendto(udp_serv_fd, (void *) &msgbuf.msg_node, \
+									sizeof(msgbuf.msg_node), 0, \
+									(const struct sockaddr *) &udp_cliaddr, \
+									sizeof(udp_cliaddr));
+					if (num < 0)
+					{
+						perror("login sendto error");
+					}
+#else
+					snd_msg_group(IMSG_LOGIN, msgbuf.msg_node.mname, "");
+#endif
 					break;
 				
 				case IMSG_LOGOUT:
 					del_node(user_head, msgbuf.msg_node.mname);
 					printf("[%s] logout \n", msgbuf.msg_node.mname);
+#ifdef NDEBUG
+					num = sendto(udp_serv_fd, (void *) &msgbuf.msg_node, \
+									sizeof(msgbuf.msg_node), 0, \
+									(const struct sockaddr *) &udp_cliaddr, \
+									sizeof(udp_cliaddr));
+					if (num < 0)
+					{
+						perror("logout sendto error");
+					}
+#else
+					snd_msg_group(IMSG_GROUP, msgbuf.msg_node.mname, " ");
+#endif
 					break;
 
 				case IMSG_PRIVATE:
@@ -233,11 +282,48 @@ void *process_msg(void *arg)
 					}
 					break;
 
+				case IMSG_GROUP:
+					printf("[%s] send group msg!\n", msgbuf.msg_node.mname);
+#ifdef NDEBUG
+					num = sendto(udp_serv_fd, (void *) &msgbuf.msg_node, \
+									sizeof(msgbuf.msg_node), 0, \
+									(const struct sockaddr *) &udp_cliaddr, \
+									sizeof(udp_cliaddr));
+					if (num < 0)
+					{
+						perror("group sendto error");
+					}
+#else
+					snd_msg_group(IMSG_GROUP, msgbuf.msg_node.mname, msgbuf.msg_node.text);
+#endif
+					break;
+
 				default:
 					break; 		
 
 			}
 		}
 
+	}
+}
+
+void snd_msg_group(const long msg_type,const char *name,const char *text)
+{
+	struct user_info *tmp = NULL;
+	int num = -1;
+	struct msg_node msgnode;
+
+	bzero(&msgnode, sizeof(msgnode));  //清零
+
+	msgnode.mtype = msg_type;		//设置消息类型
+	strcpy(msgnode.text, text);		//设置消息内容
+	strcpy(msgnode.mname, name);	//复制其姓名信息
+
+	//内核链表遍历,地址结构里存放着对应服务端的地址信息 直接发送过去即可
+	list_for_each_entry(tmp, &(user_head->user_list), user_list) {
+		num = sendto(udp_serv_fd, (void *)&msgnode , sizeof(msgnode), 0, (const struct sockaddr *)&tmp->cli_addr, sizeof(struct sockaddr_in));
+		if(num < 0) {		//出错时提示
+			perror("group sendto");
+		}
 	}
 }
